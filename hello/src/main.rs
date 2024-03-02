@@ -1,13 +1,14 @@
-use std::fs;
+use std::{fs, thread};
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
+use std::time::Duration;
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
-        println!("Connexion established !");
+
         handle_connection(stream);
     }
 }
@@ -19,13 +20,16 @@ fn handle_connection(mut stream: TcpStream) {
         .map(|result| result.unwrap())
         .take_while(|line| !line.is_empty())
         .collect();
-    println!("Request: {:#?}", http_request);
+
     let request_line = http_request.get(0).unwrap();
 
-    let (status_line, filename) = if request_line ==  "GET / HTTP/1.1" {
-        ("HTTP/1.1 200 OK", "index.html")
-    } else {
-        ("HTTP/1.1 404 NOT_FOUND", "404.html")
+    let (status_line, filename) = match &request_line[..] {
+        "GET / HTTP/1.1" => ("HTTP/1.1 200 OK", "index.html"),
+        "GET /sleep HTTP/1.1" => {
+            thread::sleep(Duration::from_secs(5));
+            ("HTTP/1.1 200 OK", "index.html")
+        }
+        _ => ("HTTP/1.1 404 NOT_FOUND", "404.html")
     };
 
     let contents = fs::read_to_string(filename).unwrap();
